@@ -11,7 +11,7 @@
 #   AR_REPO           default mvp-vertexai
 #   RUNTIME_SA        default vertex-gateway@$PROJECT_ID.iam.gserviceaccount.com
 #   ENABLE_APIS       set to 1 to enable Cloud Run / AR / Vertex / Cloud Build APIs
-#   CREATE_AR         set to 1 to create the Artifact Registry repo if missing
+#   CREATE_AR         default 1: create the Artifact Registry repo if missing
 #   CREATE_SA         set to 1 to create runtime SA + bind aiplatform.user
 #
 # CI deploy SAs usually cannot enable APIs or mutate IAM. Enable those once
@@ -44,7 +44,8 @@ fi
 
 if ! gcloud artifacts repositories describe "${AR_REPO}" \
   --location="${LOCATION}" --project="${PROJECT_ID}" >/dev/null 2>&1; then
-  if [[ "${CREATE_AR:-0}" == "1" ]]; then
+  if [[ "${CREATE_AR:-1}" == "1" ]]; then
+    echo "Creating Artifact Registry repo ${AR_REPO} in ${LOCATION}..."
     gcloud artifacts repositories create "${AR_REPO}" \
       --repository-format=docker \
       --location="${LOCATION}" \
@@ -52,7 +53,7 @@ if ! gcloud artifacts repositories describe "${AR_REPO}" \
       --project="${PROJECT_ID}"
   else
     echo "Artifact Registry repo '${AR_REPO}' not found in ${LOCATION}." >&2
-    echo "Create it once (Owner), or rerun with CREATE_AR=1 ENABLE_APIS=1." >&2
+    echo "Create it once (Owner), or rerun with CREATE_AR=1." >&2
     exit 1
   fi
 fi

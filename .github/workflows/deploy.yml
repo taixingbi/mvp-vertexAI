@@ -121,7 +121,7 @@ jobs:
           MODEL_MAP: ${{ vars.MODEL_MAP }}
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/gcp-sa.json
           ENABLE_APIS: "0"
-          CREATE_AR: "0"
+          CREATE_AR: "1"
           CREATE_SA: "0"
         run: |
           chmod +x deploy.sh
