@@ -47,7 +47,7 @@ GitHub → **Settings → Secrets and variables → Actions**:
 | Name | Purpose |
 | --- | --- |
 | `API_KEY` | Client auth (`Bearer` / `x-api-key`) |
-| `GCP_SA_KEY` | Deploy service-account **JSON** (not `.p12` / `.pem`). Must start with `{"type": "service_account"` |
+| `GCP_SA_KEY` | Deploy service-account JSON (Cloud Build + Artifact Registry + Cloud Run) |
 
 **Repository variables**
 
@@ -60,21 +60,26 @@ GitHub → **Settings → Secrets and variables → Actions**:
 
 The runtime SA needs `roles/aiplatform.user`. The deploy SA (JSON in `GCP_SA_KEY`) needs permission to build, push, and deploy Cloud Run **as** the runtime SA (`roles/run.admin`, Artifact Registry writer, Cloud Build, `iam.serviceAccountUser` on the runtime SA).
 
-Set `GCP_SA_KEY` from the `.json` key file (one line):
-
-```bash
-jq -c . path/to/sa.json | gh secret set GCP_SA_KEY --repo taixingbi/mvp-vertexAI
-```
-
 Optional: `MODEL_MAP` JSON to add aliases; `MODEL_ID` default alias (default `llama`).
 
 ## GCP setup
 
+Do this once with a project Owner (not the GitHub deploy SA):
+
 1. Create a GCP project and enable billing.
-2. Enable Vertex / Agent Platform API (`aiplatform.googleapis.com`).
+2. Enable APIs: `cloudresourcemanager.googleapis.com`, `run.googleapis.com`, `artifactregistry.googleapis.com`, `aiplatform.googleapis.com`, `cloudbuild.googleapis.com`.
 3. In Model Garden, **Enable** Llama 3.3 70B (MaaS) and GPT-OSS 20B (MaaS).
-4. Create a Cloud Run runtime service account and grant `roles/aiplatform.user`.
-5. Deploy with `deploy.sh`, or push `main` / run **Actions → Deploy**.
+4. Create Artifact Registry Docker repo `mvp-vertexai` in `us-central1`.
+5. Create runtime SA `vertex-gateway@PROJECT.iam.gserviceaccount.com` and grant `roles/aiplatform.user`.
+6. Grant the deploy SA (`GCP_SA_KEY`) Cloud Run / Artifact Registry / Cloud Build plus `iam.serviceAccountUser` on the runtime SA.
+7. Push `main` or run **Actions → Deploy**. GitHub Actions does **not** enable APIs or create IAM.
+
+First-time local bootstrap (Owner account):
+
+```bash
+export ENABLE_APIS=1 CREATE_AR=1 CREATE_SA=1
+./deploy.sh
+```
 
 ## GitHub Actions
 
@@ -86,7 +91,6 @@ Push to `main` or **workflow_dispatch** runs [`.github/workflows/deploy.yml`](.g
 export PROJECT_ID='your-gcp-project'
 export API_KEY='your-shared-secret'
 export LOCATION='us-central1'
-export CREATE_SA=1   # first time: create vertex-gateway SA + IAM binding
 
 chmod +x deploy.sh scripts/smoke.sh
 ./deploy.sh

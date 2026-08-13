@@ -10,7 +10,12 @@
 #   SERVICE_NAME      default mvp-vertexai
 #   AR_REPO           default mvp-vertexai
 #   RUNTIME_SA        default vertex-gateway@$PROJECT_ID.iam.gserviceaccount.com
+#   ENABLE_APIS       set to 1 to enable Cloud Run / AR / Vertex / Cloud Build APIs
+#   CREATE_AR         set to 1 to create the Artifact Registry repo if missing
 #   CREATE_SA         set to 1 to create runtime SA + bind aiplatform.user
+#
+# CI deploy SAs usually cannot enable APIs or mutate IAM. Enable those once
+# with a project Owner, then let Actions only build and deploy.
 set -euo pipefail
 
 PROJECT_ID="${PROJECT_ID:?set PROJECT_ID}"
@@ -27,22 +32,29 @@ echo "Service:  ${SERVICE_NAME}"
 echo "Image:    ${IMAGE}"
 echo "Runtime:  ${RUNTIME_SA}"
 
-gcloud config set project "${PROJECT_ID}" >/dev/null
-
-gcloud services enable \
-  run.googleapis.com \
-  artifactregistry.googleapis.com \
-  aiplatform.googleapis.com \
-  cloudbuild.googleapis.com \
-  --project "${PROJECT_ID}"
+if [[ "${ENABLE_APIS:-0}" == "1" ]]; then
+  gcloud services enable \
+    cloudresourcemanager.googleapis.com \
+    run.googleapis.com \
+    artifactregistry.googleapis.com \
+    aiplatform.googleapis.com \
+    cloudbuild.googleapis.com \
+    --project "${PROJECT_ID}"
+fi
 
 if ! gcloud artifacts repositories describe "${AR_REPO}" \
   --location="${LOCATION}" --project="${PROJECT_ID}" >/dev/null 2>&1; then
-  gcloud artifacts repositories create "${AR_REPO}" \
-    --repository-format=docker \
-    --location="${LOCATION}" \
-    --description="mvp-vertexAI images" \
-    --project="${PROJECT_ID}"
+  if [[ "${CREATE_AR:-0}" == "1" ]]; then
+    gcloud artifacts repositories create "${AR_REPO}" \
+      --repository-format=docker \
+      --location="${LOCATION}" \
+      --description="mvp-vertexAI images" \
+      --project="${PROJECT_ID}"
+  else
+    echo "Artifact Registry repo '${AR_REPO}' not found in ${LOCATION}." >&2
+    echo "Create it once (Owner), or rerun with CREATE_AR=1 ENABLE_APIS=1." >&2
+    exit 1
+  fi
 fi
 
 if [[ "${CREATE_SA:-0}" == "1" ]]; then

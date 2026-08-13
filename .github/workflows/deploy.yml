@@ -107,7 +107,6 @@ jobs:
           print(f"Normalized service account: {parsed.get('client_email', 'unknown')}")
           PY
           gcloud auth activate-service-account --key-file="${RUNNER_TEMP}/gcp-sa.json"
-          gcloud config set project "${PROJECT_ID}"
           gcloud auth list
 
       - name: Deploy to Cloud Run
@@ -121,6 +120,9 @@ jobs:
           MODEL_ID: ${{ vars.MODEL_ID }}
           MODEL_MAP: ${{ vars.MODEL_MAP }}
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/gcp-sa.json
+          ENABLE_APIS: "0"
+          CREATE_AR: "0"
+          CREATE_SA: "0"
         run: |
           chmod +x deploy.sh
           if [ -z "${RUNTIME_SA}" ]; then
