@@ -1,0 +1,1 @@
+"""mvp-vertexAI FastAPI gateway."""

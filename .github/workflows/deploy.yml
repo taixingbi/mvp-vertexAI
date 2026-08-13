@@ -1,0 +1,68 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  GCP_REGION: ${{ vars.GCP_REGION || 'us-central1' }}
+  SERVICE_NAME: ${{ vars.SERVICE_NAME || 'mvp-vertexai' }}
+  AR_REPO: ${{ vars.GCP_AR_REPO || 'mvp-vertexai' }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Check required secrets
+        env:
+          API_KEY: ${{ secrets.API_KEY }}
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+          GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID || secrets.GCP_PROJECT_ID }}
+        run: |
+          missing=0
+          if [ -z "$API_KEY" ]; then
+            echo "::error::Missing repository secret API_KEY. Add it under Settings → Secrets and variables → Actions → Repository secrets."
+            missing=1
+          fi
+          if [ -z "$GCP_SA_KEY" ]; then
+            echo "::error::Missing repository secret GCP_SA_KEY (deploy service-account JSON)."
+            missing=1
+          fi
+          if [ -z "$GCP_PROJECT_ID" ]; then
+            echo "::error::Missing repository variable GCP_PROJECT_ID (Settings → Secrets and variables → Actions → Variables)."
+            missing=1
+          fi
+          exit "$missing"
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy to Cloud Run
+        env:
+          PROJECT_ID: ${{ vars.GCP_PROJECT_ID || secrets.GCP_PROJECT_ID }}
+          LOCATION: ${{ env.GCP_REGION }}
+          SERVICE_NAME: ${{ env.SERVICE_NAME }}
+          AR_REPO: ${{ env.AR_REPO }}
+          API_KEY: ${{ secrets.API_KEY }}
+          RUNTIME_SA: ${{ vars.RUNTIME_SA }}
+          MODEL_ID: ${{ vars.MODEL_ID }}
+          MODEL_MAP: ${{ vars.MODEL_MAP }}
+        run: |
+          chmod +x deploy.sh
+          if [ -z "${RUNTIME_SA}" ]; then
+            unset RUNTIME_SA
+          fi
+          ./deploy.sh
