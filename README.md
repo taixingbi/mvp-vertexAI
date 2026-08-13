@@ -47,7 +47,7 @@ GitHub → **Settings → Secrets and variables → Actions**:
 | Name | Purpose |
 | --- | --- |
 | `API_KEY` | Client auth (`Bearer` / `x-api-key`) |
-| `GCP_SA_KEY` | Deploy service-account JSON (Cloud Build + Artifact Registry + Cloud Run) |
+| `GCP_SA_KEY` | Deploy service-account **JSON** (not `.p12` / `.pem`). Must start with `{"type": "service_account"` |
 
 **Repository variables**
 
@@ -59,6 +59,12 @@ GitHub → **Settings → Secrets and variables → Actions**:
 | `RUNTIME_SA` | `vertex-gateway@PROJECT.iam.gserviceaccount.com` | Cloud Run runtime SA (optional) |
 
 The runtime SA needs `roles/aiplatform.user`. The deploy SA (JSON in `GCP_SA_KEY`) needs permission to build, push, and deploy Cloud Run **as** the runtime SA (`roles/run.admin`, Artifact Registry writer, Cloud Build, `iam.serviceAccountUser` on the runtime SA).
+
+Set `GCP_SA_KEY` from the `.json` key file (one line):
+
+```bash
+jq -c . path/to/sa.json | gh secret set GCP_SA_KEY --repo taixingbi/mvp-vertexAI
+```
 
 Optional: `MODEL_MAP` JSON to add aliases; `MODEL_ID` default alias (default `llama`).
 

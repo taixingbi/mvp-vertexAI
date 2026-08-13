@@ -29,26 +29,86 @@ jobs:
         run: |
           missing=0
           if [ -z "$API_KEY" ]; then
-            echo "::error::Missing repository secret API_KEY. Add it under Settings → Secrets and variables → Actions → Repository secrets."
+            echo "::error::Missing repository secret API_KEY."
             missing=1
           fi
           if [ -z "$GCP_SA_KEY" ]; then
-            echo "::error::Missing repository secret GCP_SA_KEY (deploy service-account JSON)."
+            echo "::error::Missing repository secret GCP_SA_KEY (service-account JSON)."
             missing=1
           fi
           if [ -z "$GCP_PROJECT_ID" ]; then
-            echo "::error::Missing repository variable GCP_PROJECT_ID (Settings → Secrets and variables → Actions → Variables)."
+            echo "::error::Missing repository variable GCP_PROJECT_ID."
             missing=1
           fi
           exit "$missing"
 
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-
       - name: Set up gcloud
-        uses: google-github-actions/setup-gcloud@v2
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Authenticate with service account
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+          PROJECT_ID: ${{ vars.GCP_PROJECT_ID || secrets.GCP_PROJECT_ID }}
+        run: |
+          python3 <<'PY'
+          import base64, json, os, pathlib, sys
+
+          raw = os.environ.get("GCP_SA_KEY") or ""
+          if not raw.strip():
+              print("::error::GCP_SA_KEY is empty")
+              sys.exit(1)
+
+          blob = raw.encode("latin-1", errors="replace")
+          candidates = [raw]
+
+          if blob[:2] in (b"\xff\xfe", b"\xfe\xff") or blob[:3] == b"\xef\xbb\xbf":
+              for enc in ("utf-16", "utf-16-le", "utf-16-be", "utf-8-sig"):
+                  try:
+                      candidates.append(blob.decode(enc))
+                  except UnicodeDecodeError:
+                      pass
+
+          compact = "".join(raw.split())
+          try:
+              decoded = base64.b64decode(compact, validate=False)
+              for enc in ("utf-8", "utf-8-sig", "utf-16"):
+                  try:
+                      candidates.append(decoded.decode(enc))
+                  except UnicodeDecodeError:
+                      continue
+          except Exception:
+              pass
+
+          parsed = None
+          for item in candidates:
+              text = item.strip().lstrip("\ufeff")
+              if not text.startswith("{"):
+                  continue
+              try:
+                  parsed = json.loads(text)
+              except json.JSONDecodeError:
+                  continue
+              if isinstance(parsed, dict):
+                  break
+              parsed = None
+
+          if not isinstance(parsed, dict) or parsed.get("type") != "service_account":
+              print(
+                  "::error::GCP_SA_KEY is not a Google service-account JSON key. "
+                  "Update the secret with the downloaded .json file contents "
+                  '(must start with {"type": "service_account"}). '
+                  "Do not paste a .p12/.pem key. Example: "
+                  "jq -c . your-sa.json | gh secret set GCP_SA_KEY --repo taixingbi/mvp-vertexAI"
+              )
+              sys.exit(1)
+
+          path = pathlib.Path(os.environ["RUNNER_TEMP"]) / "gcp-sa.json"
+          path.write_text(json.dumps(parsed), encoding="utf-8")
+          print(f"Normalized service account: {parsed.get('client_email', 'unknown')}")
+          PY
+          gcloud auth activate-service-account --key-file="${RUNNER_TEMP}/gcp-sa.json"
+          gcloud config set project "${PROJECT_ID}"
+          gcloud auth list
 
       - name: Deploy to Cloud Run
         env:
@@ -60,6 +120,7 @@ jobs:
           RUNTIME_SA: ${{ vars.RUNTIME_SA }}
           MODEL_ID: ${{ vars.MODEL_ID }}
           MODEL_MAP: ${{ vars.MODEL_MAP }}
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/gcp-sa.json
         run: |
           chmod +x deploy.sh
           if [ -z "${RUNTIME_SA}" ]; then
