@@ -66,20 +66,16 @@ Optional: `MODEL_MAP` JSON to add aliases; `MODEL_ID` default alias (default `ll
 
 Do this once with a project Owner (not the GitHub deploy SA):
 
-1. Create a GCP project and enable billing.
-2. Enable APIs: `cloudresourcemanager.googleapis.com`, `run.googleapis.com`, `artifactregistry.googleapis.com`, `aiplatform.googleapis.com`, `cloudbuild.googleapis.com`.
-3. In Model Garden, **Enable** Llama 3.3 70B (MaaS) and GPT-OSS 20B (MaaS).
-4. Create Artifact Registry Docker repo `mvp-vertexai` in `us-central1`.
-5. Create runtime SA `vertex-gateway@PROJECT.iam.gserviceaccount.com` and grant `roles/aiplatform.user`.
-6. Grant the deploy SA (`GCP_SA_KEY`) Cloud Run / Artifact Registry / Cloud Build plus `iam.serviceAccountUser` on the runtime SA.
-7. Push `main` or run **Actions → Deploy**. GitHub Actions does **not** enable APIs or create IAM.
-
-First-time local bootstrap (Owner account):
-
 ```bash
-export ENABLE_APIS=1 CREATE_AR=1 CREATE_SA=1
-./deploy.sh
+export PROJECT_ID=kaden-api
+bash scripts/bootstrap-gcp.sh
 ```
+
+That enables APIs, creates repo `mvp-vertexai`, creates `vertex-gateway@...`, and grants the GitHub SA (`vertex-ai-map@...`) Artifact Registry Admin, Cloud Run Admin, Cloud Build Editor, and Service Account User.
+
+Or in Console → **IAM**, add those roles to `vertex-ai-map@kaden-api.iam.gserviceaccount.com`, then create Docker repo `mvp-vertexai` in `us-central1`.
+
+Also enable Llama 3.3 70B and GPT-OSS 20B in Model Garden. Then re-run **Actions → Deploy**.
 
 ## GitHub Actions
 

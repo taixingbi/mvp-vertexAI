@@ -46,14 +46,26 @@ if ! gcloud artifacts repositories describe "${AR_REPO}" \
   --location="${LOCATION}" --project="${PROJECT_ID}" >/dev/null 2>&1; then
   if [[ "${CREATE_AR:-1}" == "1" ]]; then
     echo "Creating Artifact Registry repo ${AR_REPO} in ${LOCATION}..."
-    gcloud artifacts repositories create "${AR_REPO}" \
+    if ! gcloud artifacts repositories create "${AR_REPO}" \
       --repository-format=docker \
       --location="${LOCATION}" \
       --description="mvp-vertexAI images" \
-      --project="${PROJECT_ID}"
+      --project="${PROJECT_ID}"; then
+      echo >&2
+      echo "The GitHub deploy SA cannot create Artifact Registry repos." >&2
+      echo "Run this once as a GCP Owner, then re-run Actions:" >&2
+      echo >&2
+      echo "  export PROJECT_ID=${PROJECT_ID}" >&2
+      echo "  bash scripts/bootstrap-gcp.sh" >&2
+      echo >&2
+      echo "  member: vertex-ai-map@${PROJECT_ID}.iam.gserviceaccount.com" >&2
+      echo "  role:   Artifact Registry Administrator" >&2
+      echo "  plus:   Cloud Run Admin, Cloud Build Editor, Service Account User" >&2
+      exit 1
+    fi
   else
     echo "Artifact Registry repo '${AR_REPO}' not found in ${LOCATION}." >&2
-    echo "Create it once (Owner), or rerun with CREATE_AR=1." >&2
+    echo "Create it once as Owner: bash scripts/bootstrap-gcp.sh" >&2
     exit 1
   fi
 fi
