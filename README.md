@@ -111,13 +111,22 @@ uvicorn app.main:app --host 127.0.0.1 --port 8080
 ## Smoke & benchmark
 
 ```bash
-export GATEWAY_URL='https://....run.app'
-export API_KEY='...'
+export GATEWAY_URL='https://mvp-vertexai-sbeecmlmza-uc.a.run.app'
+export API_KEY='你的API_KEY'
 
-bash scripts/smoke.sh
-# chat llama false / true
-# chat gpt-oss false / true
+curl -sS "${GATEWAY_URL}/health"
+curl -sS "${GATEWAY_URL}/version"
 
+bash example.md
+# or: bash scripts/smoke.sh
+```
+
+`example.md` / `scripts/smoke.sh` run:
+
+- `chat llama false` / `chat llama true`
+- `chat gpt-oss false` / `chat gpt-oss true`
+
+```bash
 python scripts/benchmark.py \
   --model llama \
   --concurrency 8 \
@@ -140,6 +149,7 @@ scripts/
 Dockerfile
 requirements.txt
 deploy.sh
+example.md
 README.md
 ```
 

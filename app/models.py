@@ -208,9 +208,24 @@ def extract_text(body: dict[str, Any]) -> str:
         message = choice.get("message") or {}
         if isinstance(message, dict):
             content = message.get("content")
-            if isinstance(content, str):
+            if isinstance(content, str) and content:
                 return content
+            if isinstance(content, list):
+                parts: list[str] = []
+                for block in content:
+                    if isinstance(block, str) and block:
+                        parts.append(block)
+                    elif isinstance(block, dict):
+                        text = block.get("text") or block.get("content")
+                        if isinstance(text, str) and text:
+                            parts.append(text)
+                if parts:
+                    return "".join(parts)
+            for key in ("reasoning_content", "reasoning"):
+                reasoning = message.get(key)
+                if isinstance(reasoning, str) and reasoning:
+                    return reasoning
         text = choice.get("text")
-        if isinstance(text, str):
+        if isinstance(text, str) and text:
             return text
     return ""

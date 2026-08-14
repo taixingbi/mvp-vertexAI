@@ -1,14 +1,19 @@
 #!/usr/bin/env bash
-# Smoke-test llama + gpt-oss (sync + stream).
+# Smoke-test Vertex gateway (sync + stream).
 # Usage:
-#   export GATEWAY_URL='https://....run.app'
-#   export API_KEY='...'
-#   bash scripts/smoke.sh
+#   export API_KEY='your-shared-secret'
+#   bash example.md
 set -euo pipefail
 
-GATEWAY_URL="${GATEWAY_URL:?set GATEWAY_URL}"
-API_KEY="${API_KEY:?set API_KEY}"
+export GATEWAY_URL="${GATEWAY_URL:-https://mvp-vertexai-sbeecmlmza-uc.a.run.app}"
+export API_KEY="1234"
 GATEWAY_URL="${GATEWAY_URL%/}"
+
+curl -sS "${GATEWAY_URL}/health"
+echo
+curl -sS "${GATEWAY_URL}/version"
+echo
+echo
 
 chat() {
   local model="$1"
@@ -40,11 +45,11 @@ chat() {
   echo
 }
 
-echo "health: $(curl -sS "${GATEWAY_URL}/health")"
-echo "version: $(curl -sS "${GATEWAY_URL}/version")"
-echo
+# Alias → Vertex MaaS ID (us-central1):
+#   llama     meta/llama-3.3-70b-instruct-maas
+#   gpt-oss   openai/gpt-oss-20b-maas
 
-for MODEL in llama gpt-oss; do
-  chat "${MODEL}" false
-  chat "${MODEL}" true
-done
+chat llama false
+chat llama true
+chat gpt-oss false
+chat gpt-oss true
