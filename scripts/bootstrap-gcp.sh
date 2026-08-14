@@ -49,12 +49,28 @@ gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
   --role="roles/aiplatform.user" \
   --condition=None >/dev/null
 
+STAGING_BUCKET="gs://${PROJECT_ID}_cloudbuild"
+if ! gcloud storage buckets describe "${STAGING_BUCKET}" >/dev/null 2>&1; then
+  gcloud storage buckets create "${STAGING_BUCKET}" \
+    --project="${PROJECT_ID}" \
+    --location=us \
+    --uniform-bucket-level-access
+fi
+
+gcloud storage buckets add-iam-policy-binding "${STAGING_BUCKET}" \
+  --member="serviceAccount:${DEPLOY_SA}" \
+  --role="roles/storage.objectAdmin"
+
+PROJECT_NUMBER="$(gcloud projects describe "${PROJECT_ID}" --format='value(projectNumber)')"
+gcloud storage buckets add-iam-policy-binding "${STAGING_BUCKET}" \
+  --member="serviceAccount:${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com" \
+  --role="roles/storage.objectAdmin" || true
+
 for ROLE in \
   roles/run.admin \
   roles/artifactregistry.admin \
   roles/cloudbuild.builds.editor \
-  roles/iam.serviceAccountUser \
-  roles/storage.admin
+  roles/iam.serviceAccountUser
 do
   gcloud projects add-iam-policy-binding "${PROJECT_ID}" \
     --member="serviceAccount:${DEPLOY_SA}" \

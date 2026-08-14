@@ -84,7 +84,27 @@ if [[ "${CREATE_SA:-0}" == "1" ]]; then
     --condition=None >/dev/null
 fi
 
-gcloud builds submit --tag "${IMAGE}" --project "${PROJECT_ID}"
+STAGING_BUCKET="gs://${PROJECT_ID}_cloudbuild"
+if ! gcloud storage buckets describe "${STAGING_BUCKET}" >/dev/null 2>&1; then
+  echo "Cloud Build staging bucket ${STAGING_BUCKET} does not exist (404)." >&2
+  echo "Create it once as Owner in Cloud Shell, then re-run Actions:" >&2
+  echo >&2
+  echo "  gcloud storage buckets create ${STAGING_BUCKET} \\" >&2
+  echo "    --project=${PROJECT_ID} --location=us --uniform-bucket-level-access" >&2
+  echo "  gcloud storage buckets add-iam-policy-binding ${STAGING_BUCKET} \\" >&2
+  echo "    --member=serviceAccount:vertex-ai-map@${PROJECT_ID}.iam.gserviceaccount.com \\" >&2
+  echo "    --role=roles/storage.objectAdmin" >&2
+  echo "  PROJECT_NUMBER=\$(gcloud projects describe ${PROJECT_ID} --format='value(projectNumber)')" >&2
+  echo "  gcloud storage buckets add-iam-policy-binding ${STAGING_BUCKET} \\" >&2
+  echo "    --member=serviceAccount:\${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com \\" >&2
+  echo "    --role=roles/storage.objectAdmin" >&2
+  exit 1
+fi
+
+gcloud builds submit \
+  --tag "${IMAGE}" \
+  --project "${PROJECT_ID}" \
+  --gcs-source-staging-dir="${STAGING_BUCKET}/source"
 
 ENV_FILE="$(mktemp)"
 {
